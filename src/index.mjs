@@ -24,10 +24,18 @@ async function main() {
     }
 
     // Single call to approve + send tokens cross-chain
-    const { approveTxHash, sendTxHash } = await icttClient.sendTokenCrossChain(recipient, amount);
-
+    const { approveTxHash, sendTxHash } = await icttClient.sendTokenCrossChain(recipient, "6");
     console.log("approveTxHash:", approveTxHash);
     console.log("sendTxHash:", sendTxHash);
+
+    console.log("\n--- Chain Information ---");
+    
+    const blockchainID = await icttClient.getBlockchainID();
+    console.log("BlockchainID:", blockchainID);
+
+    const transferredBalance = await icttClient.getTransferredBalance(process.env.DESTINATION_CHAIN_ID,process.env.TOKEN_REMOTE_CONTRACT);
+    console.log("Transferred Balance:", transferredBalance.toString());
+
   } catch (err) {
     console.error("Error during cross-chain token send:", err);
   }
