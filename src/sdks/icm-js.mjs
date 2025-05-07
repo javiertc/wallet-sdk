@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 import { createWalletClient, createPublicClient, encodeAbiParameters, parseAbiParameters, http, parseEventLogs } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { teleporterABI } from './abis/teleporterABI.mjs';
+import { teleporterABI } from '../abis/teleporterABI.mjs';
 
 // Load environment variables
 config();

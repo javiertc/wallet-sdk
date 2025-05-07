@@ -2,8 +2,8 @@ import { createWalletClient, createPublicClient, formatUnits, parseUnits, http }
 import { privateKeyToAccount } from 'viem/accounts';
 import { avalancheFuji } from 'viem/chains';
 import { erc20Abi } from 'viem';
-import { tokenHomeABI } from './abis/tokenHomeABI.mjs';
-import { teleporterABI } from './abis/teleporterABI.mjs';
+import { tokenHomeABI } from '../abis/tokenHomeABI.mjs';
+import { teleporterABI } from '../abis/teleporterABI.mjs';
 
 export class ICTT {
   constructor({
