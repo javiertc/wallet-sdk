@@ -4,9 +4,9 @@ import { ICTT } from "./ictt-js.mjs";
 config(); // loads environment variables from .env
 
 async function main() {
-  const icttClient = new ICTT({
+  const icttClie
+    privateKey: process.env.PRIVATE_KEY, // 0x...nt = new ICTT({
     chainName: process.env.CHAIN_NAME || "avalancheFuji",
-    privateKey: process.env.PRIVATE_KEY, // 0x...
     erc20Contract: process.env.ERC20_CONTRACT_ADDRESS,
     tokenHomeContract: process.env.TOKEN_HOME_CONTRACT,
     tokenRemoteContract: process.env.TOKEN_REMOTE_CONTRACT,
