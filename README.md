@@ -1,2 +1,3 @@
-# ictt-sdk
-ICTT SDK
+# wallet-sdk
+wallet SDK
+
