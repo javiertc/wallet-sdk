@@ -1,10 +1,10 @@
 import { config } from "dotenv";
-import { ICTT } from "./ictt-js.mjs";
+import { ICTT } from "../sdks/ictt-js.mjs";
 
 config(); // loads environment variables from .env
 
 async function main() {
-  const icttClie
+  const icttClient  = new ICTT({
     privateKey: process.env.PRIVATE_KEY, // 0x...nt = new ICTT({
     chainName: process.env.CHAIN_NAME || "avalancheFuji",
     erc20Contract: process.env.ERC20_CONTRACT_ADDRESS,

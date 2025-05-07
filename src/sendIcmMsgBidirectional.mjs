@@ -1,6 +1,6 @@
 // main.js
 import { config } from 'dotenv';
-import { IcmSDK } from './icm-js.mjs';
+import { IcmSDK } from '../sdks/icm-js.mjs';
 import { avalancheFuji } from 'viem/chains';
 
 // Load environment variables
