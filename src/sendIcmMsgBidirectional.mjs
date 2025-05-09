@@ -1,6 +1,6 @@
 // main.js
 import { config } from 'dotenv';
-import { IcmSDK } from '../sdks/icm-js.mjs';
+import { IcmSDK } from './sdks/icm-js.mjs';
 import { avalancheFuji } from 'viem/chains';
 
 // Load environment variables
@@ -49,7 +49,7 @@ const chainConfigs = {
 const icm = new IcmSDK(
   process.env.PRIVATE_KEY,
   process.env.TELEPORTER_ADDRESS,
-  "0xa0287d24a971a697187a6e8Fb2861624e5C510DA", // Recipient address
+  "0x49f3fd6735d245032cfe84f9974291e0f4fbf1df", // Recipient address
   chainConfigs
 );
 
@@ -57,7 +57,7 @@ const icm = new IcmSDK(
 async function main() {
   try {
     console.log("Sending message from Coffee to Fuji...");
-    const { hash, sourceChain } = await icm.sendMessage('fuji', 'coffee', 'Hello from fuji, by JTC2!');
+    const { hash, sourceChain } = await icm.sendMessage('coffee', 'fuji', 'Hello from fuji, by Angela again!');
     console.log(`Message sent with transaction hash: ${hash}`);
     await icm.processReceipt(sourceChain, hash);
   } catch (error) {
