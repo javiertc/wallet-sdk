@@ -32,8 +32,8 @@ async function main() {
     const avalancheSDK = new AvalancheSDK();
 
     const erc20Details = {
-        name: 'LIAMCOIN',
-        symbol: 'LIAM',
+        name: 'ANGELACOIN',
+        symbol: 'ANG',
         totalSupply: 1_000_000, // Will be converted to Wei by SDK
         decimals: 18
     };
@@ -52,9 +52,10 @@ async function main() {
     // The SDK will attempt to fetch destinationBlockchainID. Provide a fallback if needed.
     // const dispatchL1BlockchainID_fallback = "0xYOUR_DISPATCH_L1_BLOCKCHAIN_ID_HEX"; // TODO: Find and fill if dynamic lookup fails
 
+    const recipientAddressOnL1 = "0x8ae323046633A07FB162043f28Cea39FFc23B50A";
+
     const transferDetails = {
-        // recipient will be set to the deployer's address on Dispatch L1 by default if not specified
-        // recipient: "0xRECIPIENT_ADDRESS_ON_DISPATCH_L1", 
+        // recipient field is removed as it's now a direct parameter
         amount: "1", // 1 full token
         // destinationBlockchainID: dispatchL1BlockchainID_fallback, // SDK will try to fetch this
         // gasLimit: optional, defaults in SDK
@@ -83,6 +84,7 @@ async function main() {
             erc20Details, // Still needed for remote token name, symbol, decimals
             tokeAddress, // Pass the deployed ERC20 address
             teleporterAddresses,
+            recipientAddressOnL1, // Pass recipient address directly
             transferDetails
         );
 

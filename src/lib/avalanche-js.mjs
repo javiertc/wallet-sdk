@@ -495,8 +495,8 @@ export class AvalancheSDK {
        * @param {string} teleporterAddresses.sourceRegistry - TeleporterRegistry address on the source chain.
        * @param {string} teleporterAddresses.destinationRegistry - TeleporterRegistry address on the destination chain.
        * @param {object} transferDetails - Details for the token transfer.
-       * @param {string} [transferDetails.recipient] - Recipient address on the destination chain. Defaults to deployer's address on destination.
-       * @param {string} transferDetails.amount - Amount of tokens to transfer.
+       * @param {string} recipient - The recipient address on the destination chain.
+       * @param {string} [transferDetails.amount] - Amount of tokens to transfer.
        * @param {string} [transferDetails.destinationBlockchainID] - Optional fallback for destination blockchain ID if lookup fails.
        * @param {bigint} [transferDetails.gasLimit] - Optional gas limit for the transfer.
        * @param {string} [transferDetails.feeReceiver] - Optional fee receiver for the transfer.
@@ -510,6 +510,7 @@ export class AvalancheSDK {
         erc20Details, // Keep for name, symbol, decimals for TokenRemote
         fujiDeployedErc20Address, // New parameter
         teleporterAddresses, 
+        recipient, // New direct parameter
         transferDetails
     ) {
         if (!this.privateKey) {
@@ -643,15 +644,12 @@ export class AvalancheSDK {
                     }
                 }
 
-                let finalRecipient = transferDetails.recipient;
-                if (!finalRecipient) {
-                    if (destinationAccount && destinationAccount.address) {
-                        finalRecipient = destinationAccount.address;
-                        console.log(`Recipient not specified in transferDetails, defaulting to destination account: ${finalRecipient}`);
-                    } else {
-                        throw new Error("Recipient address for transfer is missing and could not be defaulted from destinationAccount.");
-                    }
+                // Use the direct recipient parameter
+                if (!recipient) {
+                    throw new Error("Recipient address for transfer is missing.");
                 }
+                const finalRecipient = recipient;
+                console.log(`Transferring to specified recipient: ${finalRecipient}`);
 
                 console.log(`Attempting to transfer ${transferDetails.amount} ${erc20Details.symbol} to ${finalRecipient}...`);
                 
