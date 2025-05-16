@@ -10,11 +10,21 @@ import { tokenRemoteABI } from '../abis/TokenRemoteABI.mjs';
 config();
 
 export class AvalancheSDK {
+    /**
+     * Initializes a new instance of the AvalancheSDK.
+     * Reads the PRIVATE_KEY from the .env file and throws an error if not set.
+     */
     constructor() {
         this.privateKey = process.env.PRIVATE_KEY;
-        if (!this.privateKey) throw new Error('Set PRIVATE_KEY in your .env file');``
+        if (!this.privateKey) throw new Error('Set PRIVATE_KEY in your .env file');
     }
 
+    /**
+     * Creates and initializes a wallet client for a specified chain.
+     * @param {object} chainObject - The chain configuration object (e.g., from viem/chains).
+     * @returns {Promise<object>} A promise that resolves to the account object derived from the private key.
+     * @throws {Error} If the private key is not set.
+     */
     async createAccount(chainObject) {
         const account = privateKeyToAccount(this.privateKey)
 
@@ -27,6 +37,15 @@ export class AvalancheSDK {
         return account;
     }
 
+    /**
+     * Deploys a new ERC20 token contract.
+     * @param {object} params - Parameters for the ERC20 token.
+     * @param {string} params.name - The name of the token.
+     * @param {string} params.symbol - The symbol of the token.
+     * @param {number} params.totalSupply - The total supply of the token (will be converted to Wei, assuming 18 decimals).
+     * @returns {Promise<object>} A promise that resolves to an object containing the contract address and a wait function for the transaction receipt.
+     * @throws {Error} If the wallet client is not initialized or if the deployment fails.
+     */
     async createErc20({ name, symbol, totalSupply }) {
         if (!this.walletClient) {
             throw new Error('Wallet client not initialized. Call createAccount first.');
@@ -66,6 +85,19 @@ export class AvalancheSDK {
         }
     }
 
+    /**
+     * Transfers ERC20 tokens, performing approval and then sending them via Teleporter's TokenHome.
+     * @param {string} tokenAddress - The address of the ERC20 token to transfer.
+     * @param {string} recipient - The recipient address on the destination chain.
+     * @param {string} amount - The amount of tokens to transfer (in full token units, e.g., "1" for 1 token).
+     * @param {string} tokenHome - The address of the TokenHome contract on the source chain.
+     * @param {string} tokenRemote - The address of the TokenRemote contract on the destination chain (used as destinationTokenTransferrerAddress).
+     * @param {bigint} gasLimit - The gas limit for the transactions.
+     * @param {string} feeReceiver - The address to receive fees for the Teleporter transaction.
+     * @param {string} destinationChainId - The blockchain ID of the destination chain for the Teleporter message.
+     * @returns {Promise<object>} A promise that resolves to an object containing success status, approveTxHash, and sendTxHash.
+     * @throws {Error} If the wallet client is not initialized or if any transaction fails.
+     */
     async transferTokens(tokenAddress, recipient, amount, tokenHome, tokenRemote, gasLimit, feeReceiver, destinationChainId) {
    
         const amountInWei = parseUnits(amount, 18);
@@ -153,6 +185,12 @@ export class AvalancheSDK {
         };
       }
 
+      /**
+       * Deploys a TeleporterRegistry contract.
+       * @param {Array<object>} [initialEntries=[]] - Optional initial entries for the registry.
+       * @returns {Promise<object>} A promise that resolves to an object containing the contract address and a wait function.
+       * @throws {Error} If the wallet client is not initialized or if the deployment fails.
+       */
       async deployTeleporterRegistry(initialEntries = []) {
         if (!this.walletClient) {
             throw new Error('Wallet client not initialized. Call createAccount first.');
@@ -188,6 +226,12 @@ export class AvalancheSDK {
         }
       }
 
+      /**
+       * Initializes a TeleporterRegistry contract by calling its `initializeBlockchainID` function.
+       * @param {string} registryAddress - The address of the TeleporterRegistry contract.
+       * @returns {Promise<object>} A promise that resolves to the transaction receipt, or an object indicating it was already initialized.
+       * @throws {Error} If the wallet client is not initialized or if the initialization transaction fails (unless already initialized).
+       */
       async initializeTeleporterRegistry(registryAddress) {
         if (!this.walletClient) {
             throw new Error('Wallet client not initialized. Call createAccount first.');
@@ -230,17 +274,27 @@ export class AvalancheSDK {
         }
       }
       
+      /**
+       * Deploys a TokenHome contract.
+       * @param {string} registryAddr - The address of the TeleporterRegistry contract.
+       * @param {string} managerAddr - The address of the Teleporter manager for this TokenHome.
+       * @param {string|number} minVersion - The minimum Teleporter version required.
+       * @param {string} erc20Addr - The address of the ERC20 token this TokenHome will manage.
+       * @param {number} [erc20Decimals=18] - The decimals of the ERC20 token.
+       * @returns {Promise<object>} A promise that resolves to an object containing the contract address and a wait function.
+       * @throws {Error} If the wallet client is not initialized, bytecode is missing, or deployment fails.
+       */
       async deployTokenHome(registryAddr, managerAddr, minVersion, erc20Addr, erc20Decimals = 18) {
         if (!this.walletClient) {
             throw new Error('Wallet client not initialized. Call createAccount first.');
         }
         
-        console.log(`[AVALANCHE-JS] Deploying TokenHome for token: ${erc20Addr}`);
-        console.log('[AVALANCHE-JS] Using Teleporter Registry Address:', registryAddr);
-        console.log('[AVALANCHE-JS] Using Teleporter Manager Address:', managerAddr);
-        console.log('[AVALANCHE-JS] Using Min Teleporter Version:', minVersion);
-        console.log('[AVALANCHE-JS] ERC20 Token Address to use:', erc20Addr);
-        console.log('[AVALANCHE-JS] ERC20 Token Decimals to use:', erc20Decimals);
+        console.log(`Deploying TokenHome for token: ${erc20Addr}`);
+        console.log('Using Teleporter Registry Address:', registryAddr);
+        console.log('Using Teleporter Manager Address:', managerAddr);
+        console.log('Using Min Teleporter Version:', minVersion);
+        console.log('ERC20 Token Address to use:', erc20Addr);
+        console.log('ERC20 Token Decimals to use:', erc20Decimals);
         
         // Check if bytecode exists in tokenHomeABI
         if (!tokenHomeABI.bytecode) {
@@ -287,16 +341,31 @@ export class AvalancheSDK {
       } 
       
       
+      /**
+       * Deploys a TokenRemote contract.
+       * @param {object} settings - Settings for the TokenRemote contract.
+       * @param {string} settings.teleporterRegistryAddress - Address of the TeleporterRegistry on the destination chain.
+       * @param {string} settings.teleporterManager - Manager address for this TokenRemote.
+       * @param {string|number} settings.minTeleporterVersion - Minimum Teleporter version.
+       * @param {string} settings.tokenHomeBlockchainID - Blockchain ID of the chain where TokenHome resides.
+       * @param {string} settings.tokenHomeAddress - Address of the TokenHome contract.
+       * @param {number} settings.tokenHomeDecimals - Decimals of the token on its home chain.
+       * @param {string} tokenName - The name for the ERC20 representation on the remote chain.
+       * @param {string} tokenSymbol - The symbol for the ERC20 representation on the remote chain.
+       * @param {number} tokenDecimals_for_erc20 - The decimals for this TokenRemote's own ERC20 representation.
+       * @returns {Promise<object>} A promise that resolves to an object containing the contract address and a wait function.
+       * @throws {Error} If the wallet client is not initialized, ABI/bytecode is missing, or deployment fails.
+       */
       async deployTokenRemote(settings, tokenName, tokenSymbol, tokenDecimals_for_erc20) {
         if (!this.walletClient) {
             throw new Error('Wallet client not initialized. Call createAccount first.');
         }
         
-        console.log(`[AVALANCHE-JS] Deploying TokenRemote ${tokenSymbol} for ${tokenName}...`);
-        console.log('[AVALANCHE-JS] Settings for TokenRemote:', settings);
-        console.log('[AVALANCHE-JS] ERC20 Name for TokenRemote:', tokenName);
-        console.log('[AVALANCHE-JS] ERC20 Symbol for TokenRemote:', tokenSymbol);
-        console.log('[AVALANCHE-JS] ERC20 Decimals for TokenRemote:', tokenDecimals_for_erc20);
+        console.log(`Deploying TokenRemote ${tokenSymbol} for ${tokenName}...`);
+        console.log('Settings for TokenRemote:', settings);
+        console.log('ERC20 Name for TokenRemote:', tokenName);
+        console.log('ERC20 Symbol for TokenRemote:', tokenSymbol);
+        console.log('ERC20 Decimals for TokenRemote:', tokenDecimals_for_erc20);
 
         // Construct the arguments array for the ERC20TokenRemote constructor
         const constructorArgs = [
@@ -317,7 +386,7 @@ export class AvalancheSDK {
             throw new Error('ABI and/or Bytecode for TokenRemote contract is not defined in TokenRemoteABI.mjs.');
         }
 
-        console.log('[AVALANCHE-JS] Bytecode and ABI for TokenRemote found. Proceeding with deployment...');
+        console.log('Bytecode and ABI for TokenRemote found. Proceeding with deployment...');
 
         try {
             const hash = await this.walletClient.deployContract({
@@ -326,8 +395,8 @@ export class AvalancheSDK {
                 args: constructorArgs,
             });
 
-            console.log('[AVALANCHE-JS] TokenRemote deployment transaction hash:', hash);
-            console.log('[AVALANCHE-JS] Waiting for transaction receipt...');
+            console.log('TokenRemote deployment transaction hash:', hash);
+            console.log('Waiting for transaction receipt...');
 
             const publicClient = createPublicClient({
                 chain: this.walletClient.chain,
@@ -337,30 +406,40 @@ export class AvalancheSDK {
             const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
             if (receipt.status === 'success' && receipt.contractAddress) {
-                console.log('[AVALANCHE-JS] TokenRemote contract deployed successfully! Contract address:', receipt.contractAddress);
+                console.log('TokenRemote contract deployed successfully! Contract address:', receipt.contractAddress);
                 return {
                     address: receipt.contractAddress,
                     wait: async () => receipt,
                 };
             } else {
-                console.error('[AVALANCHE-JS] TokenRemote deployment failed with receipt:', receipt);
+                console.error('TokenRemote deployment failed with receipt:', receipt);
                 throw new Error(`TokenRemote contract deployment failed. Status: ${receipt.status}`);
             }
         } catch (error) {
-            console.error('[AVALANCHE-JS] Error during TokenRemote deployment:', error.message);
-            console.error('[AVALANCHE-JS] Full error object:', error);
+            console.error('Error during TokenRemote deployment:', error.message);
+            console.error('Full error object:', error);
             throw new Error(`TokenRemote deployment failed: ${error.message}`);
         }
       }
 
+      /**
+       * Calls the `registerWithHome` function on a TokenRemote contract.
+       * This function is typically called on the destination chain to register the TokenRemote with its corresponding TokenHome.
+       * @param {string} tokenRemoteAddress - The address of the TokenRemote contract.
+       * @param {string} [feeTokenAddress=\'0x000...\'] - The address of the token to pay fees in for the registration message.
+       * @param {bigint} [feeAmount=0n] - The amount of fee tokens to pay.
+       * @param {bigint} [gasLimit=250000n] - The gas limit for the transaction.
+       * @returns {Promise<object>} A promise that resolves to the transaction receipt.
+       * @throws {Error} If the wallet client is not initialized, ABI is missing, or the transaction fails.
+       */
       async registerWithHome(tokenRemoteAddress, feeTokenAddress = '0x0000000000000000000000000000000000000000', feeAmount = 0n, gasLimit = 250000n) {
         if (!this.walletClient) {
             throw new Error('Wallet client not initialized. Call createAccount first.');
         }
 
-        console.log(`[AVALANCHE-JS] Calling registerWithHome on TokenRemote: ${tokenRemoteAddress}`);
+        console.log(`Calling registerWithHome on TokenRemote: ${tokenRemoteAddress}`);
         const feeInfo = [feeTokenAddress, feeAmount];
-        console.log('[AVALANCHE-JS] Using feeInfo:', feeInfo);
+        console.log('Using feeInfo:', feeInfo);
 
         if (!tokenRemoteABI || !tokenRemoteABI.abi) {
             throw new Error('ABI for TokenRemote contract is not defined in TokenRemoteABI.mjs.');
@@ -375,8 +454,8 @@ export class AvalancheSDK {
                 gasLimit: gasLimit,
             });
 
-            console.log('[AVALANCHE-JS] registerWithHome transaction hash:', hash);
-            console.log('[AVALANCHE-JS] Waiting for transaction receipt...');
+            console.log('registerWithHome transaction hash:', hash);
+            console.log('Waiting for transaction receipt...');
 
             const publicClient = createPublicClient({
                 chain: this.walletClient.chain,
@@ -386,19 +465,44 @@ export class AvalancheSDK {
             const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
             if (receipt.status === 'success') {
-                console.log('[AVALANCHE-JS] registerWithHome transaction successful!', receipt);
+                console.log('registerWithHome transaction successful!', receipt);
                 return receipt;
             } else {
-                console.error('[AVALANCHE-JS] registerWithHome transaction failed with receipt:', receipt);
+                console.error('registerWithHome transaction failed with receipt:', receipt);
                 throw new Error(`registerWithHome transaction failed. Status: ${receipt.status}`);
             }
         } catch (error) {
-            console.error('[AVALANCHE-JS] Error during registerWithHome call:', error.message);
-            console.error('[AVALANCHE-JS] Full error object:', error);
+            console.error('Error during registerWithHome call:', error.message);
+            console.error('Full error object:', error);
             throw new Error(`registerWithHome call failed: ${error.message}`);
         }
       }
 
+      /**
+       * Orchestrates the full end-to-end process of bridging an ERC20 token from a source chain to a destination L1 chain.
+       * This involves:
+       * 1. Setting up accounts on both chains.
+       * 2. Deploying TokenHome on the source chain.
+       * 3. Deploying TokenRemote on the destination chain.
+       * 4. Registering TokenRemote with TokenHome.
+       * 5. Transferring tokens from source to destination.
+       * Assumes the ERC20 token is already deployed on the source chain.
+       * @param {object} sourceChainConfig - Configuration object for the source chain.
+       * @param {object} destinationChainConfig - Configuration object for the destination L1 chain.
+       * @param {object} erc20Details - Details of the ERC20 token (name, symbol, decimals). TotalSupply is not used here as token is pre-deployed.
+       * @param {string} fujiDeployedErc20Address - The address of the pre-deployed ERC20 token on the source chain (Fuji).
+       * @param {object} teleporterAddresses - Addresses for TeleporterRegistry contracts.
+       * @param {string} teleporterAddresses.sourceRegistry - TeleporterRegistry address on the source chain.
+       * @param {string} teleporterAddresses.destinationRegistry - TeleporterRegistry address on the destination chain.
+       * @param {object} transferDetails - Details for the token transfer.
+       * @param {string} [transferDetails.recipient] - Recipient address on the destination chain. Defaults to deployer's address on destination.
+       * @param {string} transferDetails.amount - Amount of tokens to transfer.
+       * @param {string} [transferDetails.destinationBlockchainID] - Optional fallback for destination blockchain ID if lookup fails.
+       * @param {bigint} [transferDetails.gasLimit] - Optional gas limit for the transfer.
+       * @param {string} [transferDetails.feeReceiver] - Optional fee receiver for the transfer.
+       * @returns {Promise<object>} A promise that resolves to an object containing deployed contract addresses and transaction hashes for the transfer.
+       * @throws {Error} If any step in the bridging process fails.
+       */
       // Orchestration method for the full end-to-end bridging process
       async bridgeErc20ToL1(
         sourceChainConfig, 

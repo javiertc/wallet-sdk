@@ -338,7 +338,7 @@ async function decodeEventsFromTx(txHash) {
 // const txHash = '0x0b0e19ca41cf9527bc6511e75adffb774a478ceb5f591734440e3edcfcc685aa' //tokeSent from home in c-chain
 // const txHash = '0x02c91172c9ff1b58b06af8db9a8f27d86921f8789044d4e970a722ffbdc7709f'; // Example: Token Transfer
 // const txHash = '0x70df529c7c912878e507cb4c6cf26d1827ee993758d456d40966fa6f475f9394'; // Example: Dexalot
-const txHash = '0x517cd2437ae93b66941491cbdf8a74489606e8f37c4a98eb15748ec47fc92d42'; // Example: Token Transfer
+const txHash = '0xe76b3b3b137bfa3851c77ca7c6fd2b2037d1086ef7e231bd2cdca2f79f0899ad'; // Example: Token Transfer
 
 decodeEventsFromTx(txHash).then(events => {
   // Custom replacer function to convert BigInt to string

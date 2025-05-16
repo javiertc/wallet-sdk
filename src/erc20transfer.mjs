@@ -32,8 +32,8 @@ async function main() {
     const avalancheSDK = new AvalancheSDK();
 
     const erc20Details = {
-        name: 'JAVIERCOIN',
-        symbol: 'JTC',
+        name: 'LIAMCOIN',
+        symbol: 'LIAM',
         totalSupply: 1_000_000, // Will be converted to Wei by SDK
         decimals: 18
     };
@@ -72,8 +72,8 @@ async function main() {
             totalSupply: erc20Details.totalSupply,
             // decimals are handled within createErc20 which assumes 18, or could be added if createErc20 is made more flexible
         });
-        const fujiDeployedErc20Address = erc20Deployment.address;
-        console.log(`ERC20 (${erc20Details.symbol}) deployed on Fuji at: ${fujiDeployedErc20Address}`);
+        const tokeAddress = erc20Deployment.address;
+        console.log(`ERC20 (${erc20Details.symbol}) deployed on Fuji at: ${tokeAddress}`);
 
 
         console.log("\nStarting ERC20 bridging process...");
@@ -81,13 +81,13 @@ async function main() {
             avalancheFuji,
             dispatchL1,
             erc20Details, // Still needed for remote token name, symbol, decimals
-            fujiDeployedErc20Address, // Pass the deployed ERC20 address
+            tokeAddress, // Pass the deployed ERC20 address
             teleporterAddresses,
             transferDetails
         );
 
         console.log("\n--- Full Bridging Process Complete ---");
-        console.log("Deployed ERC20 on Fuji:", fujiDeployedErc20Address); // Use the variable from above
+        console.log("Deployed ERC20 on Fuji:", tokeAddress); // Use the variable from above
         console.log("Deployed TokenHome on Fuji:", result.tokenHomeAddress);
         console.log("Deployed TokenRemote on Dispatch L1:", result.tokenRemoteAddress);
         console.log("Transfer Approve Tx Hash (Fuji):", result.transferApproveTxHash);
