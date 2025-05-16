@@ -1,6 +1,6 @@
 // main.js
 import { config } from 'dotenv';
-import { IcmSDK } from './sdks/icm-js.mjs';
+import { IcmSDK } from './lib/icm-js.mjs';
 import { avalancheFuji } from 'viem/chains';
 
 // Load environment variables
@@ -49,7 +49,7 @@ const chainConfigs = {
 const icm = new IcmSDK(
   process.env.PRIVATE_KEY,
   process.env.TELEPORTER_ADDRESS,
-  "0x49f3fd6735d245032cfe84f9974291e0f4fbf1df", // Recipient address
+  "0x8cbfd85f0360812c97a9cd2d02d1da6f7d9f15c2", // Recipient address
   chainConfigs
 );
 

@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { ICTT } from "./sdks/ictt-js.mjs";
+import { ICTT } from "./lib/ictt-js.mjs";
 
 config(); // loads environment variables from .env
 
