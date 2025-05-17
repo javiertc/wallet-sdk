@@ -86,6 +86,40 @@ export class AvalancheSDK {
     }
 
     /**
+     * Fetches the name, symbol, and decimals for an ERC20 token.
+     * @param {object} publicClient - The public client for the chain where the ERC20 token resides.
+     * @param {`0x${string}`} tokenAddress - The address of the ERC20 token.
+     * @returns {Promise<{name: string, symbol: string, decimals: number}>} An object with token details.
+     * @throws {Error} If details cannot be fetched.
+     * @private
+     */
+    async _getErc20Details(publicClient, tokenAddress) {
+        try {
+            console.log(`Fetching details for ERC20 token at ${tokenAddress} on ${publicClient.chain.name}...`);
+            const name = await publicClient.readContract({
+                address: tokenAddress,
+                abi: erc20ABI.abi,
+                functionName: 'name',
+            });
+            const symbol = await publicClient.readContract({
+                address: tokenAddress,
+                abi: erc20ABI.abi,
+                functionName: 'symbol',
+            });
+            const decimals = await publicClient.readContract({
+                address: tokenAddress,
+                abi: erc20ABI.abi,
+                functionName: 'decimals',
+            });
+            console.log(`Fetched ERC20 Details: Name: ${name}, Symbol: ${symbol}, Decimals: ${decimals}`);
+            return { name, symbol, decimals };
+        } catch (readError) {
+            console.error(`Error fetching ERC20 details from ${tokenAddress} on ${publicClient.chain.name}:`, readError);
+            throw new Error(`Could not fetch ERC20 details (name, symbol, decimals) for token ${tokenAddress}. Ensure it is a valid ERC20 contract and the chain is reachable.`);
+        }
+    }
+
+    /**
      * Transfers ERC20 tokens, performing approval and then sending them via Teleporter's TokenHome.
      * @param {string} tokenAddress - The address of the ERC20 token to transfer.
      * @param {string} recipient - The recipient address on the destination chain.
@@ -100,7 +134,9 @@ export class AvalancheSDK {
      */
     async transferTokens(tokenAddress, recipient, amount, tokenHome, tokenRemote, gasLimit, feeReceiver, destinationChainId) {
    
-        const amountInWei = parseUnits(amount, 18);
+        // Ensure amount is a string for parseUnits
+        const amountAsString = typeof amount === 'number' ? String(amount) : amount;
+        const amountInWei = parseUnits(amountAsString, 18);
     
         console.log("Amount in Wei:", amountInWei.toString());
         console.log("Amount in Token Units:", Number(amountInWei) / 10**18);
@@ -482,15 +518,15 @@ export class AvalancheSDK {
        * Orchestrates the full end-to-end process of bridging an ERC20 token from a source chain to a destination L1 chain.
        * This involves:
        * 1. Setting up accounts on both chains.
-       * 2. Deploying TokenHome on the source chain.
-       * 3. Deploying TokenRemote on the destination chain.
-       * 4. Registering TokenRemote with TokenHome.
-       * 5. Transferring tokens from source to destination.
+       * 2. Fetching ERC20 details (name, symbol, decimals) from the source chain contract.
+       * 3. Deploying TokenHome on the source chain.
+       * 4. Deploying TokenRemote on the destination chain.
+       * 5. Registering TokenRemote with TokenHome.
+       * 6. Transferring tokens from source to destination.
        * Assumes the ERC20 token is already deployed on the source chain.
        * @param {object} sourceChainConfig - Configuration object for the source chain.
        * @param {object} destinationChainConfig - Configuration object for the destination L1 chain.
-       * @param {object} erc20Details - Details of the ERC20 token (name, symbol, decimals). TotalSupply is not used here as token is pre-deployed.
-       * @param {string} fujiDeployedErc20Address - The address of the pre-deployed ERC20 token on the source chain (Fuji).
+       * @param {string} homeErc20Address - The address of the pre-deployed ERC20 token on its home (source) chain.
        * @param {object} teleporterAddresses - Addresses for TeleporterRegistry contracts.
        * @param {string} teleporterAddresses.sourceRegistry - TeleporterRegistry address on the source chain.
        * @param {string} teleporterAddresses.destinationRegistry - TeleporterRegistry address on the destination chain.
@@ -507,12 +543,11 @@ export class AvalancheSDK {
       async bridgeErc20ToL1(
         sourceChainConfig, 
         destinationChainConfig, 
-        erc20Details, // Keep for name, symbol, decimals for TokenRemote
-        fujiDeployedErc20Address, // New parameter
+        homeErc20Address, 
         teleporterAddresses, 
-        recipient, // New direct parameter
-        amount, // Amount is now a direct parameter
-        transferOptions = {} // Optional parameters for transfer
+        recipient, 
+        amount, 
+        transferOptions = {}
     ) {
         if (!this.privateKey) {
             throw new Error('Private key not available in SDK. Ensure constructor is called.');
@@ -520,45 +555,49 @@ export class AvalancheSDK {
 
         let tokenHomeContractAddress;
         let tokenRemoteContractAddress;
-        let sourceAccount, destinationAccount;
-        let sourceRegistryBlockchainID; // Declare in higher scope
-        let destRegistryBlockchainID; // Declare in higher scope for Stage 4
+        let homeAccount, destinationAccount;
+        let homeRegistryBlockchainID;
+        let destRegistryBlockchainID;
+        let erc20OnHomeChain;  
 
-        // --- Stage 1: Source Chain (Fuji) Setup ---
-        console.log(`--- Stage 1: Source Chain (${sourceChainConfig.name}) Setup ---`);
+        console.log(`--- Stage 1: Home Chain (${sourceChainConfig.name}) Setup ---`);
         try {
-            sourceAccount = await this.createAccount(sourceChainConfig);
-            console.log(`Successfully set up account on ${sourceChainConfig.name}:`, sourceAccount.address);
+            homeAccount = await this.createAccount(sourceChainConfig);
+            console.log(`Successfully set up account on Home Chain (${sourceChainConfig.name}):`, homeAccount.address);
 
-            console.log(`Using pre-deployed ERC20 (${erc20Details.symbol}) on ${sourceChainConfig.name} at: ${fujiDeployedErc20Address}`);
+            const homePublicClient = createPublicClient({ chain: sourceChainConfig, transport: http(sourceChainConfig.rpcUrls.default.http[0]) });
 
-            const sourceTeleporterRegistryAddress = teleporterAddresses.sourceRegistry;
-            const sourceTeleporterManager = sourceAccount.address; 
-            const sourceMinTeleporterVersion = "1"; 
-            const sourceTokenDecimals = erc20Details.decimals || 18;
+            // Fetch ERC20 details from the contract using the helper method
+            erc20OnHomeChain = await this._getErc20Details(homePublicClient, homeErc20Address);
+            
+            console.log(`Using pre-deployed ERC20 (${erc20OnHomeChain.symbol}) on Home Chain (${sourceChainConfig.name}) at: ${homeErc20Address}`);
 
-            const sourcePublicClient = createPublicClient({ chain: sourceChainConfig, transport: http(sourceChainConfig.rpcUrls.default.http[0]) });
-            sourceRegistryBlockchainID = await sourcePublicClient.readContract({
-                address: sourceTeleporterRegistryAddress,
+            const homeTeleporterRegistryAddress = teleporterAddresses.sourceRegistry;
+            const homeTeleporterManager = homeAccount.address;
+            const homeMinTeleporterVersion = "1";
+            const homeTokenDecimals = erc20OnHomeChain.decimals;
+
+            homeRegistryBlockchainID = await homePublicClient.readContract({
+                address: homeTeleporterRegistryAddress,
                 abi: teleporterRegistryABI.abi,
                 functionName: "blockchainID",
             });
-            console.log(`${sourceChainConfig.name} Teleporter Registry blockchainID:`, sourceRegistryBlockchainID);
+            console.log(`Home Chain (${sourceChainConfig.name}) Teleporter Registry blockchainID:`, homeRegistryBlockchainID);
 
-            console.log(`Deploying TokenHome on ${sourceChainConfig.name}...`);
+            console.log(`Deploying TokenHome on Home Chain (${sourceChainConfig.name})...`);
             
             const tokenHomeDeployment = await this.deployTokenHome(
-                sourceTeleporterRegistryAddress,
-                sourceTeleporterManager,
-                sourceMinTeleporterVersion,
-                fujiDeployedErc20Address,
-                sourceTokenDecimals
+                homeTeleporterRegistryAddress,
+                homeTeleporterManager,
+                homeMinTeleporterVersion,
+                homeErc20Address,
+                homeTokenDecimals
             );
             tokenHomeContractAddress = tokenHomeDeployment.address;
-            console.log(`TokenHome deployed on ${sourceChainConfig.name} at: ${tokenHomeContractAddress}`);
+            console.log(`TokenHome deployed on Home Chain (${sourceChainConfig.name}) at: ${tokenHomeContractAddress}`);
         } catch (err) {
-            console.error(`Error during Source Chain (${sourceChainConfig.name}) setup:`, err);
-            throw err; // Re-throw to be caught by the caller of bridgeErc20ToL1
+            console.error(`Error during Home Chain (${sourceChainConfig.name}) setup:`, err);
+            throw err;
         }
 
         // --- Stage 2: Destination Chain (e.g., Dispatch L1) Setup ---
@@ -588,14 +627,14 @@ export class AvalancheSDK {
                 teleporterRegistryAddress: destinationTeleporterRegistryAddress,
                 teleporterManager: destinationAccount.address, 
                 minTeleporterVersion: "1",
-                tokenHomeBlockchainID: sourceRegistryBlockchainID, // ID of the source chain (Fuji)
+                tokenHomeBlockchainID: homeRegistryBlockchainID,
                 tokenHomeAddress: tokenHomeContractAddress,
-                tokenHomeDecimals: erc20Details.decimals || 18 
+                tokenHomeDecimals: erc20OnHomeChain.decimals 
             };
 
-            const remoteTokenName = `${erc20Details.name} (${destinationChainConfig.name})`;
-            const remoteTokenSymbol = `d${erc20Details.symbol}`.slice(0,10); // Ensure symbol isn't too long
-            const remoteTokenDecimalsForItself = erc20Details.decimals || 18;
+            const remoteTokenName = `${erc20OnHomeChain.name} (${destinationChainConfig.name})`;
+            const remoteTokenSymbol = erc20OnHomeChain.symbol.slice(0,10); 
+            const remoteTokenDecimalsForItself = erc20OnHomeChain.decimals;
 
             console.log(`Deploying TokenRemote on ${destinationChainConfig.name}...`);
             const tokenRemoteDeploymentResult = await this.deployTokenRemote(
@@ -629,46 +668,45 @@ export class AvalancheSDK {
             throw new Error(errMsg);
         }
 
-        // --- Stage 4: Transfer Tokens (Source to Destination) ---
-        console.log(`\n--- Stage 4: Transfer Tokens from ${sourceChainConfig.name} to ${destinationChainConfig.name} ---`);
-        if (fujiDeployedErc20Address && tokenHomeContractAddress && tokenRemoteContractAddress && destinationAccount) {
+        // --- Stage 4: Transfer Tokens (Home to Destination) ---
+        console.log(`\n--- Stage 4: Transfer Tokens from Home Chain (${sourceChainConfig.name}) to ${destinationChainConfig.name} ---`);
+        if (homeErc20Address && tokenHomeContractAddress && tokenRemoteContractAddress && destinationAccount) {
             try {
-                await this.createAccount(sourceChainConfig); // Switch SDK context back to Source Chain
-                console.log(`Switched SDK context back to ${sourceChainConfig.name} for transfer.`);
+                await this.createAccount(sourceChainConfig);
+                console.log(`Switched SDK context back to Home Chain (${sourceChainConfig.name}) for transfer.`);
 
-                let destinationChainIdForTransfer = destRegistryBlockchainID; // Use the one fetched from dest registry
+                let destinationChainIdForTransfer = destRegistryBlockchainID;
                 if (!destinationChainIdForTransfer) {
                     console.warn("Destination blockchain ID for transfer was not fetched from registry, ensure transferOptions.destinationBlockchainID is correct.");
-                    destinationChainIdForTransfer = transferOptions.destinationBlockchainID; // Use transferOptions
+                    destinationChainIdForTransfer = transferOptions.destinationBlockchainID;
                     if(!destinationChainIdForTransfer) {
                         throw new Error("Destination Blockchain ID for transfer is missing.")
                     }
                 }
 
-                // Use the direct recipient parameter
                 if (!recipient) {
                     throw new Error("Recipient address for transfer is missing.");
                 }
                 const finalRecipient = recipient;
                 console.log(`Transferring to specified recipient: ${finalRecipient}`);
 
-                console.log(`Attempting to transfer ${amount} ${erc20Details.symbol} to ${finalRecipient}...`); // Use direct amount
+                console.log(`Attempting to transfer ${amount} ${erc20OnHomeChain.symbol} to ${finalRecipient}...`);
                 
                 const transferResult = await this.transferTokens(
-                    fujiDeployedErc20Address, 
+                    homeErc20Address, 
                     finalRecipient, 
-                    amount, // Use direct amount
+                    amount,
                     tokenHomeContractAddress, 
                     tokenRemoteContractAddress, 
-                    transferOptions.gasLimit || 250000n, // Use transferOptions
-                    transferOptions.feeReceiver || '0x0000000000000000000000000000000000000000', // Use transferOptions
+                    transferOptions.gasLimit || 250000n,
+                    transferOptions.feeReceiver || '0x0000000000000000000000000000000000000000',
                     destinationChainIdForTransfer
                 );
 
                 if (transferResult.success) {
                     console.log("Token transfer initiated successfully!");
                     return {
-                        erc20Address: fujiDeployedErc20Address,
+                        erc20Address: homeErc20Address,
                         tokenHomeAddress: tokenHomeContractAddress,
                         tokenRemoteAddress: tokenRemoteContractAddress,
                         transferApproveTxHash: transferResult.approveTxHash,
@@ -679,7 +717,7 @@ export class AvalancheSDK {
                     throw new Error(`Token transfer failed: ${transferResult.error}`);
                 }
             } catch (err) {
-                console.error(`Error during cross-chain token transfer (${sourceChainConfig.name} to ${destinationChainConfig.name}):`, err);
+                console.error(`Error during cross-chain token transfer (Home Chain ${sourceChainConfig.name} to ${destinationChainConfig.name}):`, err);
                 throw err;
             }
         } else {
