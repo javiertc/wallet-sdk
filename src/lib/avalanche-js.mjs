@@ -494,12 +494,12 @@ export class AvalancheSDK {
        * @param {object} teleporterAddresses - Addresses for TeleporterRegistry contracts.
        * @param {string} teleporterAddresses.sourceRegistry - TeleporterRegistry address on the source chain.
        * @param {string} teleporterAddresses.destinationRegistry - TeleporterRegistry address on the destination chain.
-       * @param {object} transferDetails - Details for the token transfer.
        * @param {string} recipient - The recipient address on the destination chain.
-       * @param {string} [transferDetails.amount] - Amount of tokens to transfer.
-       * @param {string} [transferDetails.destinationBlockchainID] - Optional fallback for destination blockchain ID if lookup fails.
-       * @param {bigint} [transferDetails.gasLimit] - Optional gas limit for the transfer.
-       * @param {string} [transferDetails.feeReceiver] - Optional fee receiver for the transfer.
+       * @param {string} amount - Amount of tokens to transfer (e.g., "1" for 1 token).
+       * @param {object} [transferOptions={}] - Optional parameters for the transfer.
+       * @param {string} [transferOptions.destinationBlockchainID] - Optional fallback for destination blockchain ID if lookup fails.
+       * @param {bigint} [transferOptions.gasLimit] - Optional gas limit for the transfer.
+       * @param {string} [transferOptions.feeReceiver] - Optional fee receiver for the transfer.
        * @returns {Promise<object>} A promise that resolves to an object containing deployed contract addresses and transaction hashes for the transfer.
        * @throws {Error} If any step in the bridging process fails.
        */
@@ -511,7 +511,8 @@ export class AvalancheSDK {
         fujiDeployedErc20Address, // New parameter
         teleporterAddresses, 
         recipient, // New direct parameter
-        transferDetails
+        amount, // Amount is now a direct parameter
+        transferOptions = {} // Optional parameters for transfer
     ) {
         if (!this.privateKey) {
             throw new Error('Private key not available in SDK. Ensure constructor is called.');
@@ -637,8 +638,8 @@ export class AvalancheSDK {
 
                 let destinationChainIdForTransfer = destRegistryBlockchainID; // Use the one fetched from dest registry
                 if (!destinationChainIdForTransfer) {
-                    console.warn("Destination blockchain ID for transfer was not fetched from registry, ensure transferDetails.destinationBlockchainID is correct.");
-                    destinationChainIdForTransfer = transferDetails.destinationBlockchainID;
+                    console.warn("Destination blockchain ID for transfer was not fetched from registry, ensure transferOptions.destinationBlockchainID is correct.");
+                    destinationChainIdForTransfer = transferOptions.destinationBlockchainID; // Use transferOptions
                     if(!destinationChainIdForTransfer) {
                         throw new Error("Destination Blockchain ID for transfer is missing.")
                     }
@@ -651,16 +652,16 @@ export class AvalancheSDK {
                 const finalRecipient = recipient;
                 console.log(`Transferring to specified recipient: ${finalRecipient}`);
 
-                console.log(`Attempting to transfer ${transferDetails.amount} ${erc20Details.symbol} to ${finalRecipient}...`);
+                console.log(`Attempting to transfer ${amount} ${erc20Details.symbol} to ${finalRecipient}...`); // Use direct amount
                 
                 const transferResult = await this.transferTokens(
                     fujiDeployedErc20Address, 
                     finalRecipient, 
-                    transferDetails.amount, 
+                    amount, // Use direct amount
                     tokenHomeContractAddress, 
                     tokenRemoteContractAddress, 
-                    transferDetails.gasLimit || 250000n, 
-                    transferDetails.feeReceiver || '0x0000000000000000000000000000000000000000',
+                    transferOptions.gasLimit || 250000n, // Use transferOptions
+                    transferOptions.feeReceiver || '0x0000000000000000000000000000000000000000', // Use transferOptions
                     destinationChainIdForTransfer
                 );
 
