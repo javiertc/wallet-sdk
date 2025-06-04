@@ -67,37 +67,21 @@ export class AvalancheSDK {
         if (!this.walletClient) {
             throw new Error('Wallet client not initialized. Call createAccount first.');
         }
-
-        console.log(`Deploying ${name} (${symbol}) with initial supply ${totalSupply}...`);
-
-        // Assuming 18 decimals for the token
         const initialSupplyWei = BigInt(totalSupply) * 10n ** 18n;
-
         const hash = await this.walletClient.deployContract({
             abi: erc20ABI.abi,
             bytecode: erc20ABI.bytecode,
             args: [name, symbol, initialSupplyWei, this.walletClient.account.address],
         });
-
-        console.log("address", this.walletClient.account.address);
-        console.log('Deployment transaction hash:', hash);
-        console.log('Waiting for transaction receipt...');
-
         const publicClient = createPublicClient({
             chain: this.walletClient.chain,
             transport: http(this.walletClient.chain.rpcUrls.default.http[0]),
         });
-
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
-
         if (receipt.status === 'success' && receipt.contractAddress) {
-            console.log('Contract deployed successfully! Contract address:', receipt.contractAddress);
-            return {
-                address: receipt.contractAddress,
-                wait: async () => receipt,
-            };
+            return { address: receipt.contractAddress, wait: async () => receipt };
         } else {
-            console.error('Deployment failed:', receipt);
+            console.error('ERC20 Deployment failed:', receipt);
             throw new Error(`Contract deployment failed. Status: ${receipt.status}`);
         }
     }
@@ -112,7 +96,6 @@ export class AvalancheSDK {
      */
     async _getErc20Details(publicClient, tokenAddress) {
         try {
-            console.log(`Fetching details for ERC20 token at ${tokenAddress} on ${publicClient.chain.name}...`);
             const name = await publicClient.readContract({
                 address: tokenAddress,
                 abi: erc20ABI.abi,
@@ -128,7 +111,6 @@ export class AvalancheSDK {
                 abi: erc20ABI.abi,
                 functionName: 'decimals',
             });
-            console.log(`Fetched ERC20 Details: Name: ${name}, Symbol: ${symbol}, Decimals: ${decimals}`);
             return { name, symbol, decimals };
         } catch (readError) {
             console.error(`Error fetching ERC20 details from ${tokenAddress} on ${publicClient.chain.name}:`, readError);
@@ -150,31 +132,18 @@ export class AvalancheSDK {
      * @throws {Error} If the wallet client is not initialized or if any transaction fails.
      */
     async transferTokens(tokenAddress, recipient, amount, tokenHome, tokenRemote, gasLimit, feeReceiver, destinationChainId) {
-
-        // Ensure amount is a string for parseUnits
         const amountAsString = typeof amount === 'number' ? String(amount) : amount;
         const amountInWei = parseUnits(amountAsString, 18);
-
-        console.log("Amount in Wei:", amountInWei.toString());
-        console.log("Amount in Token Units:", Number(amountInWei) / 10 ** 18);
-
-        console.log("Checking token balance before transfer...");
-
-        // Create public client for transaction receipt and balance check
         const publicClient = createPublicClient({
             chain: this.walletClient.chain,
             transport: http(this.walletClient.chain.rpcUrls.default.http[0]),
         });
-
-        // Check token balance
         const balance = await publicClient.readContract({
             address: tokenAddress,
             abi: erc20ABI.abi,
             functionName: "balanceOf",
             args: [this.walletClient.account.address],
         });
-        console.log("Account balance for token", tokenAddress, ":", balance.toString(), "Wei");
-        console.log("Account balance in Token Units:", Number(balance) / 10 ** 18);
         if (balance < amountInWei) {
             console.error("Insufficient token balance for transfer. Required:", amountInWei.toString(), "Wei");
             console.error("Required in Token Units:", Number(amountInWei) / 10 ** 18);
@@ -186,10 +155,6 @@ export class AvalancheSDK {
                 sendTxHash: null
             };
         }
-
-        console.log("Approving tokens for transfer...");
-
-        // Approve tokens for transfer
         const approveTxHash = await this.walletClient.writeContract({
             address: tokenAddress,
             abi: erc20ABI.abi,
@@ -197,13 +162,7 @@ export class AvalancheSDK {
             args: [tokenHome, amountInWei],
             gasLimit
         });
-
-        console.log("Approve transaction hash:", approveTxHash);
-
-        // Wait for the approval transaction to be mined
         const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-        // console.log("Approval transaction mined:", approveReceipt);
-
         const sendTokensInput = {
             destinationBlockchainID: destinationChainId,
             destinationTokenTransferrerAddress: tokenRemote,
@@ -214,11 +173,6 @@ export class AvalancheSDK {
             requiredGasLimit: 250000n,
             multiHopFallback: '0x0000000000000000000000000000000000000000',
         };
-
-        console.log("Sending tokens cross-chain...");
-        console.log(sendTokensInput);
-
-        // Send tokens cross-chain
         const sendTxHash = await this.walletClient.writeContract({
             address: tokenHome,
             abi: tokenHomeABI.abi,
@@ -226,11 +180,7 @@ export class AvalancheSDK {
             args: [sendTokensInput, amountInWei],
             gasLimit: 5000000n
         });
-
-        // Wait for the send transaction to be mined
         const sendReceipt = await publicClient.waitForTransactionReceipt({ hash: sendTxHash });
-        //  console.log("Send transaction mined:", sendReceipt);
-
         return {
             success: true,
             approveTxHash,
@@ -518,7 +468,7 @@ export class AvalancheSDK {
             const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
             if (receipt.status === 'success') {
-                console.log('registerWithHome transaction successful!', receipt);
+                console.log('TokenRemote registration transaction successful.');
                 return receipt;
             } else {
                 console.error('registerWithHome transaction failed with receipt:', receipt);
@@ -821,10 +771,6 @@ export class AvalancheSDK {
         const destBlockchainID = destChainObject.blockchainId;
         const recipientAddress = recipient || this.defaultRecipient;
 
-        // console.log(`Sending message from ${sourceChainObject.name} to ${destChainObject.name}`);
-        // console.log(`Destination blockchain ID: ${destBlockchainID}`); // Commented out
-        // console.log(`Message: "${message}"`);
-
         // Encode the message as bytes
         const encodedMessage = encodeAbiParameters(
             parseAbiParameters('string'),
@@ -853,7 +799,6 @@ export class AvalancheSDK {
             gas: 1000000n // Explicit gas limit
         });
 
-        // console.log(`Transaction sent: ${hash}`); // Commented out to avoid duplicate logging
         return { hash, sourceChainName: sourceChainName };
     }
 

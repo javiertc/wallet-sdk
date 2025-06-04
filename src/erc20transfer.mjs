@@ -2,68 +2,64 @@ import { config } from "dotenv";
 import { AvalancheSDK } from "./lib/avalanche-js.mjs";
 import { avalancheFuji, dispatchL1 } from './lib/chains.mjs';
 
-config(); // loads environment variables from .env
+config();
 
 async function main() {
+  console.log("🚀 Starting ERC20 Token Deployment and Bridging Process...");
   const avalancheSDK = new AvalancheSDK();
 
   const recipientAddressOnL1 = "0x8ae323046633A07FB162043f28Cea39FFc23B50A";
-  const amountToTransfer = 1; // Changed to number: 1 full token
+  const amountToTransfer = 1;
 
   try {
-    console.log("Setting up account on Fuji and deploying ERC20 token...");
-    // Stage 0: Deploy ERC20 on Source Chain (Fuji)
-    await avalancheSDK.createAccount(avalancheFuji); // Initialize account for Fuji
+    await avalancheSDK.createAccount(avalancheFuji);
     
     const erc20ToDeploy = {
-      name: 'PEPPECOIN',
-      symbol: 'PEPE',
-      totalSupply: 1_000_000, // Will be converted to Wei by SDK
-      // Decimals for createErc20 are assumed 18 by the SDK method, or it could be enhanced to take a decimals param
+      name: 'Summit 2025',
+      symbol: 'S2025',
+      totalSupply: 1_000_000,
     };
 
-    const token = await avalancheSDK.createErc20({
-      name: erc20ToDeploy.name,
-      symbol: erc20ToDeploy.symbol,
-      totalSupply: erc20ToDeploy.totalSupply,
-    });
-  
-    console.log(`ERC20 (${erc20ToDeploy.symbol}) deployed on Fuji at: ${token.address}`);
+    console.log(`   Deploying ${erc20ToDeploy.symbol} token on Fuji...`);
+    const token = await avalancheSDK.createErc20(erc20ToDeploy);
+    console.log(`✅ ${erc20ToDeploy.symbol} deployed on Fuji: ${token.address}`);
 
-  
     const teleporterAddresses = {
-      sourceRegistry: avalancheFuji.contracts.teleporterRegistry.address, // Fuji official Teleporter Registry
-      destinationRegistry: dispatchL1.contracts.teleporterRegistry.address // Dispatch L1 Teleporter Registry 
+      sourceRegistry: avalancheFuji.contracts.teleporterRegistry.address,
+      destinationRegistry: dispatchL1.contracts.teleporterRegistry.address 
     };
 
-    console.log("\nStarting ERC20 bridging process...");
+    console.log(`\n   Bridging ${amountToTransfer} ${erc20ToDeploy.symbol} from Fuji to Dispatch L1 for ${recipientAddressOnL1}...`);
     const result = await avalancheSDK.bridgeErc20ToL1(
       avalancheFuji,
       dispatchL1,
-      token.address, // Pass the deployed ERC20 address
+      token.address,
       teleporterAddresses,
       recipientAddressOnL1,
-      amountToTransfer // Pass amount directly
-      // No transferOptions needed for now as we're using defaults from SDK
+      amountToTransfer
     );
 
-    console.log("\n--- Full Bridging Process Complete ---");
-    console.log("Deployed ERC20 on Fuji:", token.address);
-    console.log("Deployed TokenHome on Fuji:", result.tokenHomeAddress);
-    console.log("Deployed TokenRemote on Dispatch L1:", result.tokenRemoteAddress);
-    console.log("Transfer Approve Tx Hash (Fuji):", result.transferApproveTxHash);
-    console.log("Transfer Send Tx Hash (Fuji):", result.transferSendTxHash);
+    console.log("\n🎉 --- Full Bridging Process Complete --- 🎉");
+    console.log(`   TokenHome on Fuji:      ${result.tokenHomeAddress}`);
+    console.log(`   TokenRemote on Dispatch L1: ${result.tokenRemoteAddress}`);
+    console.log(`   Approve Tx (Fuji):      ${result.transferApproveTxHash}`);
+    console.log(`   Send Tx (Fuji):         ${result.transferSendTxHash}`);
 
   } catch (err) {
-    console.error("\n--- Error in Full Bridging Process ---");
-    console.error("Error during end-to-end bridging operation:", err.message);
+    console.error("\n🛑 --- Error in Bridging Process --- 🛑");
+    console.error("   Error:", err.message);
     if (err.cause) {
-      console.error("Cause:", err.cause);
+      console.error("   Cause:", err.cause);
     }
+    // Consider re-throwing or exiting if it's a fatal script error
+    // process.exit(1);
   }
 }
 
 main().catch((err) => {
-  console.error("Unhandled error in main execution:", err);
+  console.error("\n🛑 --- Unhandled Top-Level Error --- 🛑");
+  console.error("   Error:", err.message);
+  console.error("   Stack:", err.stack);
+  process.exit(1);
 });
 

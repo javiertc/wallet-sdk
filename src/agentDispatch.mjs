@@ -52,20 +52,10 @@ async function main() {
   const sdk = new AvalancheSDK();
   await sdk.createAccount(dispatchL1);
   const myAddress = sdk.walletClient.account.address;
-  const dispatchAgentDisplayName = "🛰️  [DISPATCH AGENT]";
-  const fujiAgentDisplayName = "❄️  [FUJI AGENT]";
+  const agentName = "🛰️  [DISPATCH AGENT]";
+  const partnerChainName = "Fuji";
 
-  console.log(`\n${dispatchAgentDisplayName} (${myAddress}) online. Watching for messages from ${fujiAgentDisplayName}.`);
-
-  if (process.env.SEND_INITIAL_GREETING === 'true') {
-    const initialMessage = 'Hello Fuji, Dispatch agent online!';
-    try {
-      const txResult = await sdk.sendMessage(dispatchL1, avalancheFuji, initialMessage, myAddress);
-      console.log(formatChatMessage(dispatchAgentDisplayName, dispatchAgentDisplayName, 'SENT', initialMessage, txResult.hash, txResult.sourceChainName));
-    } catch (e) {
-      console.error(`\n${dispatchAgentDisplayName} Error sending initial greeting:`, e.message);
-    }
-  }
+  console.log(`\n${agentName} (${myAddress}) online. Watching for messages from ${partnerChainName}.`);
 
   const publicClient = createPublicClient({
     chain: dispatchL1,
@@ -98,12 +88,12 @@ async function main() {
         try {
             [incoming] = decodeAbiParameters(parseAbiParameters('string'), payloadBytes);
         } catch (decodeError) {
-            console.error(`\n${dispatchAgentDisplayName} Error decoding message (Tx: ${log.transactionHash}):`, decodeError.message);
+            console.error(`\n${agentName} Error decoding message (Tx: ${log.transactionHash}):`, decodeError.message);
             continue;
         }
 
         // For received messages, messageSourceAgentDisplayName is the partner
-        console.log(formatChatMessage(dispatchAgentDisplayName, fujiAgentDisplayName, 'RECEIVED', incoming, log.transactionHash, dispatchL1.name));
+        console.log(formatChatMessage(agentName, partnerChainName, 'RECEIVED', incoming, log.transactionHash, dispatchL1.name));
         
         try {
             const completion = await openai.chat.completions.create({
@@ -118,18 +108,18 @@ async function main() {
             const reply = completion.choices[0].message.content ? completion.choices[0].message.content.trim() : "[empty OpenAI response]";
 
             if (reply.startsWith("[") || reply === "") {
-                // console.warn(`${dispatchAgentDisplayName} AI response was empty/problematic. Not sending.`);
+                // console.warn(`${agentName} AI response was empty/problematic. Not sending.`);
             } else {
                 const txResult = await sdk.sendMessage(dispatchL1, avalancheFuji, reply, myAddress);
-                console.log(formatChatMessage(dispatchAgentDisplayName, dispatchAgentDisplayName, 'SENT', reply, txResult.hash, txResult.sourceChainName));
+                console.log(formatChatMessage(agentName, agentName, 'SENT', reply, txResult.hash, txResult.sourceChainName));
             }
         } catch (openaiError) {
-            console.error(`\n${dispatchAgentDisplayName} Error during OpenAI call (for incoming: "${incoming}"):`, openaiError.message);
+            console.error(`\n${agentName} Error during OpenAI call (for incoming: "${incoming}"):`, openaiError.message);
         }
       }
       lastProcessedBlock = currentBlock;
     } catch (error) {
-      console.error(`\n${dispatchAgentDisplayName} Error during polling:`, error.message);
+      console.error(`\n${agentName} Error during polling:`, error.message);
     }
   }
   setInterval(pollForMessages, POLLING_INTERVAL_MS);

@@ -57,7 +57,7 @@ const icm = new IcmSDK(
 async function main() {
   try {
     console.log("Sending message from Coffee to Fuji...");
-    const { hash, sourceChain } = await icm.sendMessage('coffee', 'fuji', 'Hello from fuji, by Angela again!');
+    const { hash, sourceChain } = await icm.sendMessage('coffee', 'fuji', 'Hello from fuji, by JTC again!');
     console.log(`Message sent with transaction hash: ${hash}`);
     await icm.processReceipt(sourceChain, hash);
   } catch (error) {
